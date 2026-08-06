@@ -1,0 +1,72 @@
+{
+  "name": "pi-sprites",
+  "version": "0.1.0",
+  "description": "First-class Sprites environments for the Pi coding agent",
+  "type": "module",
+  "license": "MIT",
+  "author": "Fly.io",
+  "homepage": "https://sprites.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superfly/pi-sprites.git"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "sprites",
+    "coding-agent",
+    "remote-development",
+    "sandbox"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "extensions",
+    "src",
+    "skills",
+    "prompts",
+    "templates",
+    "runtime",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "check": "npm run build && npm test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "@fly/sprites": "^0.2.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.84.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.6",
+    "typebox": "^1.3.11",
+    "typescript": "^5.9.3"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/core.ts",
+      "./extensions/checkpoints.ts",
+      "./extensions/services.ts",
+      "./extensions/policy.ts",
+      "./extensions/bootstrap.ts",
+      "./extensions/ci.ts",
+      "./extensions/workers.ts",
+      "./extensions/rpc-host.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  }
+}

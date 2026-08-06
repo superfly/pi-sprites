@@ -88,4 +88,11 @@ export class PiSpritesRuntime {
   }
 }
 
-export const runtime = new PiSpritesRuntime();
+// Pi intentionally evaluates each extension entry point with its module cache disabled.
+// Keep one runtime on globalThis so separately loaded pi-sprites extensions share
+// the selected Sprite, configuration, proxies, and checkpoint state.
+const sharedGlobal = globalThis as typeof globalThis & {
+  __piSpritesRuntimeV1?: PiSpritesRuntime;
+};
+
+export const runtime = sharedGlobal.__piSpritesRuntimeV1 ??= new PiSpritesRuntime();

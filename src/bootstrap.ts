@@ -1,6 +1,7 @@
 import { dirname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { APIError, type Sprite } from "@fly/sprites";
+import { listUnfilteredCheckpoints } from "./checkpoints.js";
 import { sanitizeName } from "./config.js";
 import { collectEvents } from "./output.js";
 import { applyPolicies } from "./policy.js";
@@ -81,9 +82,9 @@ export async function bootstrapSprite(pi: ExtensionAPI, requestedName?: string):
   if (serviceEvents.length) report.push(...serviceEvents.map((line) => `service: ${line}`));
 
   if (config.checkpoint !== false) {
-    const before = new Set((await sprite.listCheckpoints("all")).map((item) => item.id));
+    const before = new Set((await listUnfilteredCheckpoints(sprite)).map((item) => item.id));
     await collectEvents(await sprite.createCheckpoint(`pi-sprites bootstrap: ${runtime.remoteCwd}`));
-    const checkpoint = (await sprite.listCheckpoints("all"))
+    const checkpoint = (await listUnfilteredCheckpoints(sprite))
       .filter((item) => !before.has(item.id))
       .sort((a, b) => b.createTime.getTime() - a.createTime.getTime())[0];
     if (checkpoint) {

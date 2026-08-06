@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, ToolCallEvent } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { shellQuote, splitArgs } from "../src/args.js";
+import { listUnfilteredCheckpoints } from "../src/checkpoints.js";
 import { parsePositiveInteger } from "../src/config.js";
 import { collectEvents, errorMessage, textResult } from "../src/output.js";
 import { runtime } from "../src/runtime.js";
@@ -12,9 +13,9 @@ function checkpointTargetAvailable(): boolean {
 async function createCheckpoint(pi: ExtensionAPI, comment: string): Promise<string> {
   if (runtime.selectedName) {
     const sprite = runtime.sprite();
-    const before = new Set((await sprite.listCheckpoints("all")).map((item) => item.id));
+    const before = new Set((await listUnfilteredCheckpoints(sprite)).map((item) => item.id));
     await collectEvents(await sprite.createCheckpoint(comment));
-    const created = (await sprite.listCheckpoints("all"))
+    const created = (await listUnfilteredCheckpoints(sprite))
       .filter((item) => !before.has(item.id))
       .sort((a, b) => b.createTime.getTime() - a.createTime.getTime())[0];
     if (!created) throw new Error("Checkpoint completed but its id was not returned by the API.");
@@ -33,7 +34,7 @@ async function createCheckpoint(pi: ExtensionAPI, comment: string): Promise<stri
 
 async function listCheckpoints(pi: ExtensionAPI): Promise<string> {
   if (runtime.selectedName) {
-    const checkpoints = await runtime.sprite().listCheckpoints("all");
+    const checkpoints = await listUnfilteredCheckpoints(runtime.sprite());
     return checkpoints.length
       ? checkpoints
         .sort((a, b) => b.createTime.getTime() - a.createTime.getTime())
@@ -67,7 +68,7 @@ async function pruneCheckpoints(): Promise<void> {
   if (!runtime.selectedName) return;
   const retention = parsePositiveInteger(runtime.config.checkpoint?.retention, 10);
   const sprite = runtime.sprite();
-  const checkpoints = (await sprite.listCheckpoints("all"))
+  const checkpoints = (await listUnfilteredCheckpoints(sprite))
     .filter((item) => !item.isAuto)
     .sort((a, b) => b.createTime.getTime() - a.createTime.getTime());
   const stale = checkpoints.slice(retention);

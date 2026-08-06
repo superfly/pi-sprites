@@ -7,9 +7,14 @@ export class PiSpritesRuntime {
   private client: SpritesClient | undefined;
   private proxies = new Set<ProxySession>();
   private configuredCwd: string | undefined;
+  private configuredTrust: boolean | undefined;
   private overrides: RuntimeOverrides = {};
+  private sessionId: string | undefined;
+  private spriteToolBaseline: Set<string> | undefined;
 
   config: PiSpritesConfig = {};
+  coreAvailable = false;
+  projectTrusted = false;
   localCwd = process.cwd();
   selectedName: string | undefined;
   remoteCwd = defaultRemoteCwd(process.cwd());
@@ -17,18 +22,39 @@ export class PiSpritesRuntime {
 
   readonly insideSprite = existsSync("/.sprite/api.sock");
 
-  configure(cwd: string, overrides: RuntimeOverrides = {}): void {
+  private configure(cwd: string, projectTrusted: boolean, preserveSelection: boolean): void {
+    const selectedName = this.selectedName;
+    const remoteCwd = this.remoteCwd;
     this.localCwd = cwd;
     this.configuredCwd = cwd;
-    this.overrides = { ...this.overrides, ...overrides };
-    this.config = loadConfig(cwd, this.overrides);
-    this.selectedName = this.config.sprite || this.selectedName;
-    this.remoteCwd = this.config.remoteCwd || defaultRemoteCwd(cwd);
+    this.configuredTrust = projectTrusted;
+    this.projectTrusted = projectTrusted;
+    this.config = loadConfig(cwd, this.overrides, projectTrusted);
+    this.selectedName = this.config.sprite || (preserveSelection ? selectedName : undefined);
+    this.remoteCwd = this.config.remoteCwd || (preserveSelection ? remoteCwd : defaultRemoteCwd(cwd));
     this.client = undefined;
   }
 
-  ensureConfigured(cwd: string): void {
-    if (this.configuredCwd !== cwd) this.configure(cwd, this.overrides);
+  beginSession(sessionId: string, cwd: string, projectTrusted: boolean, overrides: RuntimeOverrides = {}): void {
+    const isNewSession = this.sessionId !== sessionId;
+    if (isNewSession) {
+      this.releaseResources();
+      this.selectedName = undefined;
+      this.lastCheckpoint = undefined;
+      this.overrides = {};
+      this.spriteToolBaseline = undefined;
+      this.coreAvailable = false;
+      this.sessionId = sessionId;
+    }
+    this.overrides = { ...this.overrides, ...overrides };
+    if (isNewSession || this.configuredCwd !== cwd || this.configuredTrust !== projectTrusted || Object.keys(overrides).length > 0) {
+      this.configure(cwd, projectTrusted, !isNewSession);
+    }
+  }
+
+  ensureConfigured(cwd: string, projectTrusted: boolean): void {
+    if (!this.sessionId) this.beginSession(`implicit:${cwd}`, cwd, projectTrusted);
+    else if (this.configuredCwd !== cwd || this.configuredTrust !== projectTrusted) this.configure(cwd, projectTrusted, true);
   }
 
   remoteEnabled(): boolean {
@@ -51,8 +77,15 @@ export class PiSpritesRuntime {
   }
 
   sprite(name = this.selectedName): Sprite {
-    if (!name) throw new Error("No Sprite selected. Use /sprite-use <name> or --sprite <name>.");
+    if (!name) throw this.selectionError();
     return this.getClient().sprite(name);
+  }
+
+  selectionError(): Error {
+    const guidance = this.coreAvailable
+      ? "Use /sprite-use <name> or --sprite <name>."
+      : "Enable core.ts for /sprite-use, or configure sprite in a trusted .pi/sprites.json.";
+    return new Error(`No Sprite selected. ${guidance}`);
   }
 
   select(name: string, remoteCwd?: string): void {
@@ -75,10 +108,43 @@ export class PiSpritesRuntime {
     this.proxies.add(proxy);
   }
 
-  async close(): Promise<void> {
+  markCoreAvailable(): void {
+    this.coreAvailable = true;
+  }
+
+  private releaseResources(): void {
     for (const proxy of this.proxies) proxy.close();
     this.proxies.clear();
     if (this.selectedName && this.client) this.client.sprite(this.selectedName).closeControlConnection();
+  }
+
+  async endSession(sessionId: string): Promise<void> {
+    if (this.sessionId !== sessionId) return;
+    this.releaseResources();
+    this.sessionId = undefined;
+    this.configuredCwd = undefined;
+    this.configuredTrust = undefined;
+    this.overrides = {};
+    this.config = {};
+    this.projectTrusted = false;
+    this.coreAvailable = false;
+    this.selectedName = undefined;
+    this.remoteCwd = defaultRemoteCwd(process.cwd());
+    this.lastCheckpoint = undefined;
+    this.spriteToolBaseline = undefined;
+    this.client = undefined;
+  }
+
+  captureSpriteToolBaseline(activeTools: string[], spriteToolNames: ReadonlySet<string>): void {
+    if (!this.spriteToolBaseline) {
+      this.spriteToolBaseline = new Set(activeTools.filter((name) => spriteToolNames.has(name)));
+    }
+  }
+
+  desiredSpriteTools(): ReadonlySet<string> {
+    const enabled = this.config.toolActivation === "always"
+      || (this.config.toolActivation !== "off" && (this.remoteEnabled() || this.insideSprite));
+    return enabled ? (this.spriteToolBaseline || new Set<string>()) : new Set<string>();
   }
 
   status(): string {
@@ -92,7 +158,7 @@ export class PiSpritesRuntime {
 // Keep one runtime on globalThis so separately loaded pi-sprites extensions share
 // the selected Sprite, configuration, proxies, and checkpoint state.
 const sharedGlobal = globalThis as typeof globalThis & {
-  __piSpritesRuntimeV1?: PiSpritesRuntime;
+  __piSpritesRuntimeV2?: PiSpritesRuntime;
 };
 
-export const runtime = sharedGlobal.__piSpritesRuntimeV1 ??= new PiSpritesRuntime();
+export const runtime = sharedGlobal.__piSpritesRuntimeV2 ??= new PiSpritesRuntime();

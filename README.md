@@ -60,7 +60,7 @@ pi --sprite pi-my-project --sprite-cwd /workspace/my-project
 | Extension | Main commands and tools |
 |---|---|
 | Core remote environment | `/sprite`, `/sprite-use`, `/sprite-new`, `/sprite-local`, `/sprite-proxy`, `sprite_manage` |
-| Transactional checkpoints | `/sprite-checkpoint`, `/sprite-checkpoints`, `/sprite-diff`, `/sprite-restore`, `/sprite-undo`, `sprite_checkpoint` |
+| Transactional checkpoints | `/sprite-checkpoint`, `/sprite-checkpoints`, `/sprite-restore`, `/sprite-undo`, `sprite_checkpoint` |
 | Services | `/sprite-services`, `/sprite-service`, `sprite_service` |
 | Policies | `/sprite-policy`, `sprite_policy` |
 | Reproducible bootstrap | `/sprite-bootstrap`, `sprite_bootstrap` |
@@ -68,7 +68,7 @@ pi --sprite pi-my-project --sprite-cwd /workspace/my-project
 | Worker pool | `/sprite-workers`, `sprite_workers` |
 | Durable Pi RPC host | `/sprite-rpc`, `sprite_rpc_host` |
 
-The extensions are separate manifest resources. A Pi package filter can disable any module that a project does not need.
+The extensions are separate manifest resources. Each feature module initializes configuration and session cleanup independently, so package filters can disable modules that a project does not need. Keep `core.ts` enabled for native tool routing and interactive Sprite selection; the other modules can also target a Sprite declared in configuration or operate from inside a Sprite without it.
 
 ## Project configuration
 
@@ -77,20 +77,25 @@ Copy [`templates/sprites.json`](./templates/sprites.json) to `.pi/sprites.json` 
 The major sections are:
 
 - `sprite`, `remoteCwd`, `mode`, `baseURL`, and `tokenEnv` — core selection and authentication.
-- `checkpoint` — `off`, `risky`, or once-per-mutating-`turn` checkpointing and retention.
+- `toolActivation` — `auto` (default), `always`, or `off` for LLM-callable `sprite_*` tools.
+- `checkpoint` — `off`, `risky`, or once-per-mutating-`turn` checkpointing.
 - `bootstrap` — repository, branch, trusted setup commands, services, and a known-good checkpoint.
 - `policy` — network, privilege, and memory resource policies.
 - `ci` — command, name prefix, and `never`, `on-success`, or `always` cleanup.
 - `workers` — pool size, name prefix, optional Pi agent command, and cleanup.
 - `rpcHost` — internal port, optional HTTP service port, Pi binary, and bearer-secret environment variable.
 
-Bootstrap uses the project's existing `origin` URL when `bootstrap.repository` is omitted. It never uploads an uncommitted local working tree implicitly.
+Project configuration is ignored until Pi trusts the project, and its shape is validated before use. Bootstrap additionally refuses to execute configured shell commands without active project trust. It uses the project's existing `origin` URL when `bootstrap.repository` is omitted and never uploads an uncommitted local working tree implicitly.
+
+With the default `toolActivation: "auto"`, commands remain available but the eight `sprite_*` LLM tools are inactive while Pi is using local tools. Selecting a Sprite activates the package tools; `/sprite-local` deactivates them again. Set `toolActivation` to `"always"` in trusted configuration when the model should be able to provision CI or workers before a Sprite is selected.
 
 ## Checkpoints
 
 The default `risky` mode creates one safety checkpoint before the first write, edit, destructive shell command, or mutating Sprite management tool in a Pi turn. `turn` applies the same once-per-turn checkpoint to any mutation; `off` disables automatic checkpoints.
 
 Restore remains command-only and requires confirmation. Checkpoints contain the filesystem, installed packages, configuration, and on-disk databases. They do not contain running processes, memory, or open connections.
+
+Checkpoint deletion and filesystem diffs are intentionally not implemented until the public Sprites SDK exposes stable APIs for them. The package does not reach through SDK internals or assume a private checkpoint mount layout.
 
 ## Services and networking
 
@@ -106,7 +111,7 @@ Use the bundled `sprite-api-gateway` skill for credential-brokered calls to GitH
 
 ## CI and workers
 
-`/sprite-ci` provisions a branch-scoped environment, bootstraps it, runs the configured command, and retains it by default. A failed run captures a diagnostic checkpoint.
+`/sprite-ci` provisions a branch-scoped environment, bootstraps it, runs the configured command, and retains it by default. A failed run captures a diagnostic checkpoint. CI and bootstrap use explicit Sprite handles and never change the user's selected routing target.
 
 `/sprite-workers shell "npm test" "npm run lint"` runs independent commands concurrently. Agent mode sends each task over stdin to `workers.agentCommand`:
 
@@ -120,7 +125,7 @@ Use the bundled `sprite-api-gateway` skill for credential-brokered calls to GitH
 }
 ```
 
-Model access must already be configured inside worker Sprites. Workers do not share uncommitted filesystem changes.
+Model access must already be configured inside worker Sprites. Workers do not share uncommitted filesystem changes. Worker orchestration keeps an explicit handle and working directory for each worker, so concurrent Pi tools continue targeting the user's selected Sprite.
 
 ## Durable Pi RPC host
 
@@ -145,6 +150,7 @@ The service has no public HTTP port by default. When `rpcHost.httpPort` is confi
 - Public URL access is never enabled automatically.
 - Provider credentials are not copied into Sprites.
 - Project setup commands run only from a trusted project's configuration.
+- New, resumed, and forked Pi sessions reset selection, proxies, and last-checkpoint state.
 
 Pi packages execute with the user's full permissions. Review package source before installation, just as you would any other Pi extension.
 

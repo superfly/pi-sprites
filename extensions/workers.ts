@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { splitArgs } from "../src/args.js";
+import { registerRuntimeLifecycle } from "../src/extension.js";
 import { errorMessage, textResult } from "../src/output.js";
 import { runtime } from "../src/runtime.js";
 import { runWorkers } from "../src/workers.js";
@@ -16,11 +17,12 @@ function formatResults(results: WorkerResult[]): string {
 }
 
 export default function workersExtension(pi: ExtensionAPI): void {
+  registerRuntimeLifecycle(pi);
   pi.registerCommand("sprite-workers", {
     description: "Run shell tasks or Pi agents across a persistent Sprite worker pool",
     handler: async (input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         const [mode = "status", ...tasks] = splitArgs(input);
         if (mode === "status") {
           const prefix = runtime.config.workers?.namePrefix || "pi-worker";
@@ -30,7 +32,7 @@ export default function workersExtension(pi: ExtensionAPI): void {
         }
         if (mode !== "shell" && mode !== "agent") throw new Error('Usage: /sprite-workers [status|shell "task"...|agent "prompt"...]');
         ctx.ui.setWorkingMessage(`Running ${tasks.length} Sprite workers…`);
-        const results = await runWorkers(pi, tasks, mode);
+        const results = await runWorkers(pi, tasks, mode, undefined, ctx.isProjectTrusted());
         ctx.ui.notify(formatResults(results), results.every((item) => item.exitCode === 0) ? "info" : "error");
       } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
       finally { ctx.ui.setWorkingMessage(); }
@@ -48,8 +50,8 @@ export default function workersExtension(pi: ExtensionAPI): void {
       count: Type.Optional(Type.Number({ minimum: 1, maximum: 16 })),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      runtime.ensureConfigured(ctx.cwd);
-      const results = await runWorkers(pi, params.tasks, params.mode, params.count);
+      runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
+      const results = await runWorkers(pi, params.tasks, params.mode, params.count, ctx.isProjectTrusted());
       return textResult(formatResults(results), { results });
     },
   });

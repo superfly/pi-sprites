@@ -1,21 +1,20 @@
 import type { ExtensionAPI, ExtensionContext, ToolCallEvent } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { shellQuote, splitArgs } from "../src/args.js";
-import { listUnfilteredCheckpoints } from "../src/checkpoints.js";
-import { parsePositiveInteger } from "../src/config.js";
+import { splitArgs } from "../src/args.js";
+import { registerRuntimeLifecycle } from "../src/extension.js";
 import { collectEvents, errorMessage, textResult } from "../src/output.js";
 import { runtime } from "../src/runtime.js";
 
 function checkpointTargetAvailable(): boolean {
-  return Boolean(runtime.selectedName) || runtime.insideSprite;
+  return runtime.remoteEnabled() || runtime.insideSprite;
 }
 
 async function createCheckpoint(pi: ExtensionAPI, comment: string): Promise<string> {
   if (runtime.selectedName) {
     const sprite = runtime.sprite();
-    const before = new Set((await listUnfilteredCheckpoints(sprite)).map((item) => item.id));
+    const before = new Set((await sprite.listCheckpoints()).map((item) => item.id));
     await collectEvents(await sprite.createCheckpoint(comment));
-    const created = (await listUnfilteredCheckpoints(sprite))
+    const created = (await sprite.listCheckpoints())
       .filter((item) => !before.has(item.id))
       .sort((a, b) => b.createTime.getTime() - a.createTime.getTime())[0];
     if (!created) throw new Error("Checkpoint completed but its id was not returned by the API.");
@@ -29,12 +28,12 @@ async function createCheckpoint(pi: ExtensionAPI, comment: string): Promise<stri
     runtime.lastCheckpoint = id;
     return id;
   }
-  throw new Error("Select a Sprite first with /sprite-use <name>.");
+  throw runtime.selectionError();
 }
 
 async function listCheckpoints(pi: ExtensionAPI): Promise<string> {
   if (runtime.selectedName) {
-    const checkpoints = await listUnfilteredCheckpoints(runtime.sprite());
+    const checkpoints = await runtime.sprite().listCheckpoints();
     return checkpoints.length
       ? checkpoints
         .sort((a, b) => b.createTime.getTime() - a.createTime.getTime())
@@ -47,7 +46,7 @@ async function listCheckpoints(pi: ExtensionAPI): Promise<string> {
     if (result.code !== 0) throw new Error(result.stderr || "Unable to list checkpoints");
     return result.stdout.trim() || "No checkpoints found.";
   }
-  throw new Error("Select a Sprite first with /sprite-use <name>.");
+  throw runtime.selectionError();
 }
 
 async function restoreCheckpoint(pi: ExtensionAPI, id: string): Promise<void> {
@@ -61,39 +60,20 @@ async function restoreCheckpoint(pi: ExtensionAPI, id: string): Promise<void> {
     if (result.code !== 0) throw new Error(result.stderr || result.stdout || "Restore failed");
     return;
   }
-  throw new Error("Select a Sprite first with /sprite-use <name>.");
-}
-
-async function pruneCheckpoints(): Promise<void> {
-  if (!runtime.selectedName) return;
-  const retention = parsePositiveInteger(runtime.config.checkpoint?.retention, 10);
-  const sprite = runtime.sprite();
-  const checkpoints = (await listUnfilteredCheckpoints(sprite))
-    .filter((item) => !item.isAuto)
-    .sort((a, b) => b.createTime.getTime() - a.createTime.getTime());
-  const stale = checkpoints.slice(retention);
-  for (const checkpoint of stale) {
-    const client = sprite.client;
-    const response = await fetch(`${client.baseURL}/v1/sprites/${encodeURIComponent(sprite.name)}/checkpoints/${encodeURIComponent(checkpoint.id)}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${client.token}` },
-    });
-    if (!response.ok && response.status !== 409) {
-      throw new Error(`Failed to prune checkpoint ${checkpoint.id}: ${response.status} ${await response.text()}`);
-    }
-  }
+  throw runtime.selectionError();
 }
 
 function mutatesState(event: ToolCallEvent): boolean {
   if (event.toolName === "write" || event.toolName === "edit") return true;
   if (event.toolName !== "bash") {
-    return ["sprite_service", "sprite_policy", "sprite_bootstrap", "sprite_ci", "sprite_workers", "sprite_rpc_host"].includes(event.toolName);
+    return ["sprite_service", "sprite_policy", "sprite_rpc_host"].includes(event.toolName);
   }
   const command = "command" in event.input ? String(event.input.command) : "";
   return /(?:\brm\b|\bmv\b|\bcp\b|\bsed\s+-i\b|\binstall\b|\bupdate\b|\bupgrade\b|\bmigrate\b|\bdeploy\b|\bgit\s+(?:reset|clean|checkout|rebase)\b|\b(?:npm|pnpm|yarn|pip|apt|apk|brew)\s+(?:install|update|upgrade)\b)/i.test(command);
 }
 
 export default function checkpointExtension(pi: ExtensionAPI): void {
+  registerRuntimeLifecycle(pi);
   let checkpointedThisTurn = false;
   let pending: Promise<string> | undefined;
   let turnIndex = 0;
@@ -102,10 +82,9 @@ export default function checkpointExtension(pi: ExtensionAPI): void {
     description: "Create a named filesystem checkpoint",
     handler: async (input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         const comment = input.trim() || `Pi session checkpoint ${new Date().toISOString()}`;
         const id = await createCheckpoint(pi, comment);
-        await pruneCheckpoints();
         ctx.ui.notify(`Created checkpoint ${id}: ${comment}`, "info");
       } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
     },
@@ -114,7 +93,7 @@ export default function checkpointExtension(pi: ExtensionAPI): void {
   pi.registerCommand("sprite-checkpoints", {
     description: "List filesystem checkpoints",
     handler: async (_input, ctx) => {
-      try { runtime.ensureConfigured(ctx.cwd); ctx.ui.notify(await listCheckpoints(pi), "info"); }
+      try { runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted()); ctx.ui.notify(await listCheckpoints(pi), "info"); }
       catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
     },
   });
@@ -123,7 +102,7 @@ export default function checkpointExtension(pi: ExtensionAPI): void {
     description: "Restore a checkpoint after confirmation",
     handler: async (input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         const id = splitArgs(input)[0] || "";
         if (!id) throw new Error("Usage: /sprite-restore <checkpoint-id>");
         const confirmed = await ctx.ui.confirm("Restore checkpoint?", `This replaces the current filesystem with ${id} and restarts the environment.`);
@@ -138,27 +117,12 @@ export default function checkpointExtension(pi: ExtensionAPI): void {
     description: "Restore the last checkpoint created by Pi",
     handler: async (_input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         if (!runtime.lastCheckpoint) throw new Error("Pi has not created a checkpoint in this session.");
         const confirmed = await ctx.ui.confirm("Undo to last checkpoint?", `Restore ${runtime.lastCheckpoint}? Current filesystem changes will be replaced.`);
         if (!confirmed) return;
         await restoreCheckpoint(pi, runtime.lastCheckpoint);
         ctx.ui.notify(`Restore of ${runtime.lastCheckpoint} started.`, "warning");
-      } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
-    },
-  });
-
-  pi.registerCommand("sprite-diff", {
-    description: "Diff the current remote workspace against a checkpoint",
-    handler: async (input, ctx) => {
-      try {
-        runtime.ensureConfigured(ctx.cwd);
-        if (!runtime.selectedName) throw new Error("/sprite-diff requires a remotely selected Sprite.");
-        const id = splitArgs(input)[0] || runtime.lastCheckpoint;
-        if (!id) throw new Error("Usage: /sprite-diff <checkpoint-id>");
-        const checkpointPath = `/.sprite/checkpoints/${id}${runtime.remoteCwd}`;
-        const result = await runtime.sprite().exec(`/usr/bin/diff -ruN ${shellQuote(checkpointPath)} ${shellQuote(runtime.remoteCwd)} || true`, { maxBuffer: 8 * 1024 * 1024 });
-        ctx.ui.notify(String(result.stdout).trim() || `No filesystem differences from ${id}.`, "info");
       } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
     },
   });
@@ -174,10 +138,9 @@ export default function checkpointExtension(pi: ExtensionAPI): void {
       id: Type.Optional(Type.String()),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      runtime.ensureConfigured(ctx.cwd);
+      runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
       if (params.action === "create") {
         const id = await createCheckpoint(pi, params.comment || "Pi checkpoint");
-        await pruneCheckpoints();
         return textResult(`Created checkpoint ${id}`, { id });
       }
       if (params.action === "list") return textResult(await listCheckpoints(pi));
@@ -194,7 +157,7 @@ export default function checkpointExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    runtime.ensureConfigured(ctx.cwd);
+    runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
     const mode = runtime.config.checkpoint?.mode || "risky";
     if (mode === "off" || checkpointedThisTurn || !checkpointTargetAvailable()) return;
     if (mode === "risky" && !mutatesState(event)) return;
@@ -202,7 +165,6 @@ export default function checkpointExtension(pi: ExtensionAPI): void {
     try {
       await pending;
       checkpointedThisTurn = true;
-      await pruneCheckpoints();
     } catch (error) {
       return { block: true, reason: `Could not create safety checkpoint: ${errorMessage(error)}` };
     } finally {

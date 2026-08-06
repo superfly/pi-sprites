@@ -10,6 +10,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { splitArgs } from "../src/args.js";
+import { registerRuntimeLifecycle, syncSpriteTools } from "../src/extension.js";
 import { errorMessage, textResult } from "../src/output.js";
 import {
   createRemoteBashOps,
@@ -39,7 +40,7 @@ async function listSprites(): Promise<string> {
 }
 
 async function showStatus(ctx: ExtensionContext): Promise<void> {
-  runtime.ensureConfigured(ctx.cwd);
+  runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
   if (!runtime.selectedName) {
     ctx.ui.notify(`Sprites mode: ${runtime.status()}`, "info");
     return;
@@ -48,27 +49,32 @@ async function showStatus(ctx: ExtensionContext): Promise<void> {
   ctx.ui.notify(`${describeSprite(sprite)}\nRemote cwd: ${runtime.remoteCwd}\nTool mode: ${runtime.remoteEnabled() ? "remote" : "local"}`, "info");
 }
 
-async function useSprite(name: string, remoteCwd: string | undefined, ctx: ExtensionContext): Promise<void> {
+async function useSprite(name: string, remoteCwd: string | undefined, ctx: ExtensionContext, pi: ExtensionAPI): Promise<void> {
   if (!name) throw new Error("Usage: /sprite-use <name> [remote-cwd]");
   await runtime.getClient().getSprite(name);
   runtime.select(name, remoteCwd);
+  syncSpriteTools(pi);
   updateStatus(ctx);
   ctx.ui.notify(`Pi tools now target ${runtime.status()}`, "info");
 }
 
-async function createSprite(name: string, ctx: ExtensionContext): Promise<void> {
+async function createSprite(name: string, ctx: ExtensionContext, pi: ExtensionAPI): Promise<void> {
   if (!name) throw new Error("Usage: /sprite-new <name>");
   const sprite = await runtime.create(name);
+  syncSpriteTools(pi);
   updateStatus(ctx);
   ctx.ui.notify(`Created ${describeSprite(sprite)}\nPi tools now target ${runtime.status()}`, "info");
 }
 
-async function destroySprite(name: string, ctx: ExtensionCommandContext): Promise<void> {
+async function destroySprite(name: string, ctx: ExtensionCommandContext, pi: ExtensionAPI): Promise<void> {
   if (!name) throw new Error("Usage: /sprite-destroy <name>");
   const confirmed = await ctx.ui.confirm("Destroy Sprite?", `${name} and all of its data will be permanently deleted.`);
   if (!confirmed) return;
   await runtime.getClient().deleteSprite(name);
-  if (runtime.selectedName === name) runtime.useLocal();
+  if (runtime.selectedName === name) {
+    runtime.useLocal();
+    syncSpriteTools(pi);
+  }
   updateStatus(ctx);
   ctx.ui.notify(`Destroyed ${name}.`, "info");
 }
@@ -104,6 +110,16 @@ export default function coreExtension(pi: ExtensionAPI): void {
   pi.registerFlag("sprite", { description: "Route Pi tools to this Sprite", type: "string" });
   pi.registerFlag("sprite-cwd", { description: "Working directory inside the selected Sprite", type: "string" });
   pi.registerFlag("sprite-local", { description: "Keep Pi tools local even when a Sprite is configured", type: "boolean", default: false });
+  registerRuntimeLifecycle(pi, () => {
+    const flagSprite = pi.getFlag("sprite");
+    const flagCwd = pi.getFlag("sprite-cwd");
+    const local = pi.getFlag("sprite-local") === true;
+    return {
+      ...(typeof flagSprite === "string" && { sprite: flagSprite }),
+      ...(typeof flagCwd === "string" && { remoteCwd: flagCwd }),
+      ...(local && { mode: "local" as const }),
+    };
+  }, true);
 
   const localCwd = process.cwd();
   const localRead = createReadTool(localCwd);
@@ -186,13 +202,14 @@ export default function coreExtension(pi: ExtensionAPI): void {
       sessionId: Type.Optional(Type.String({ description: "Exec session id for kill_session" })),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      runtime.ensureConfigured(ctx.cwd);
+      runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
       switch (params.action) {
         case "status": return textResult(runtime.status(), { sprite: runtime.selectedName, cwd: runtime.remoteCwd });
         case "list": return textResult(await listSprites());
         case "create": {
           if (!params.name) throw new Error("name is required for create");
           await runtime.create(params.name);
+          syncSpriteTools(pi);
           updateStatus(ctx);
           return textResult(`Created and selected ${runtime.status()}`);
         }
@@ -200,11 +217,13 @@ export default function coreExtension(pi: ExtensionAPI): void {
           if (!params.name) throw new Error("name is required for select");
           await runtime.getClient().getSprite(params.name);
           runtime.select(params.name, params.cwd);
+          syncSpriteTools(pi);
           updateStatus(ctx);
           return textResult(`Selected ${runtime.status()}`);
         }
         case "local":
           runtime.useLocal();
+          syncSpriteTools(pi);
           updateStatus(ctx);
           return textResult("Pi tools now run locally.");
         case "sessions": {
@@ -225,17 +244,17 @@ export default function coreExtension(pi: ExtensionAPI): void {
     description: "Manage Sprites: list, status, use, new, local, sessions, proxy, destroy",
     handler: async (input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         const [action = "status", ...args] = splitArgs(input);
         switch (action) {
           case "status": await showStatus(ctx); break;
           case "list": ctx.ui.notify(await listSprites(), "info"); break;
-          case "use": await useSprite(args[0] || "", args[1], ctx); break;
-          case "new": await createSprite(args[0] || "", ctx); break;
-          case "local": runtime.useLocal(); updateStatus(ctx); ctx.ui.notify("Pi tools now run locally.", "info"); break;
+          case "use": await useSprite(args[0] || "", args[1], ctx, pi); break;
+          case "new": await createSprite(args[0] || "", ctx, pi); break;
+          case "local": runtime.useLocal(); syncSpriteTools(pi); updateStatus(ctx); ctx.ui.notify("Pi tools now run locally.", "info"); break;
           case "sessions": await sessions(args, ctx); break;
           case "proxy": await proxyPort(args, ctx); break;
-          case "destroy": await destroySprite(args[0] || "", ctx); break;
+          case "destroy": await destroySprite(args[0] || "", ctx, pi); break;
           default: throw new Error("Usage: /sprite [status|list|use|new|local|sessions|proxy|destroy] ...");
         }
       } catch (error) {
@@ -245,30 +264,22 @@ export default function coreExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("sprite-use", { description: "Select a Sprite and optional remote cwd", handler: async (input, ctx) => {
-    try { const args = splitArgs(input); await useSprite(args[0] || "", args[1], ctx); } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
+    try { const args = splitArgs(input); await useSprite(args[0] || "", args[1], ctx, pi); } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
   }});
   pi.registerCommand("sprite-new", { description: "Create and select a Sprite", handler: async (input, ctx) => {
-    try { await createSprite(splitArgs(input)[0] || "", ctx); } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
+    try { await createSprite(splitArgs(input)[0] || "", ctx, pi); } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
   }});
   pi.registerCommand("sprite-local", { description: "Return Pi tools to the local machine", handler: async (_input, ctx) => {
-    runtime.useLocal(); updateStatus(ctx); ctx.ui.notify("Pi tools now run locally.", "info");
+    runtime.useLocal(); syncSpriteTools(pi); updateStatus(ctx); ctx.ui.notify("Pi tools now run locally.", "info");
   }});
   pi.registerCommand("sprite-proxy", { description: "Proxy a Sprite TCP port locally", handler: async (input, ctx) => {
     try { await proxyPort(splitArgs(input), ctx); } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
   }});
   pi.registerCommand("sprite-destroy", { description: "Permanently destroy a Sprite with confirmation", handler: async (input, ctx) => {
-    try { await destroySprite(splitArgs(input)[0] || "", ctx); } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
+    try { await destroySprite(splitArgs(input)[0] || "", ctx, pi); } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
   }});
 
   pi.on("session_start", (_event, ctx) => {
-    const flagSprite = pi.getFlag("sprite");
-    const flagCwd = pi.getFlag("sprite-cwd");
-    const local = pi.getFlag("sprite-local") === true;
-    runtime.configure(ctx.cwd, {
-      ...(typeof flagSprite === "string" && { sprite: flagSprite }),
-      ...(typeof flagCwd === "string" && { remoteCwd: flagCwd }),
-      ...(local && { mode: "local" as const }),
-    });
     updateStatus(ctx);
   });
 
@@ -284,7 +295,4 @@ export default function coreExtension(pi: ExtensionAPI): void {
     return { systemPrompt: event.systemPrompt.includes(localLine) ? event.systemPrompt.replace(localLine, remoteLine) : `${event.systemPrompt}\n\n${remoteLine}` };
   });
 
-  pi.on("session_shutdown", async () => {
-    await runtime.close();
-  });
 }

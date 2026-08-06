@@ -3,9 +3,9 @@
   "sprite": "pi-my-project",
   "remoteCwd": "/workspace/my-project",
   "tokenEnv": "SPRITES_TOKEN",
+  "toolActivation": "auto",
   "checkpoint": {
-    "mode": "risky",
-    "retention": 10
+    "mode": "risky"
   },
   "bootstrap": {
     "repository": "git@github.com:example/my-project.git",

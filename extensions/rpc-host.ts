@@ -1,16 +1,18 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { splitArgs } from "../src/args.js";
+import { registerRuntimeLifecycle } from "../src/extension.js";
 import { errorMessage, textResult } from "../src/output.js";
 import { installRpcHost, proxyRpcHost, removeRpcHost, rpcHostStatus } from "../src/rpc-host.js";
 import { runtime } from "../src/runtime.js";
 
 export default function rpcHostExtension(pi: ExtensionAPI): void {
+  registerRuntimeLifecycle(pi);
   pi.registerCommand("sprite-rpc", {
     description: "Install, inspect, proxy, or remove a durable Pi RPC host service",
     handler: async (input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         const [action = "status", ...args] = splitArgs(input);
         const sprite = runtime.sprite();
         if (action === "install") {
@@ -42,7 +44,7 @@ export default function rpcHostExtension(pi: ExtensionAPI): void {
       localPort: Type.Optional(Type.Number()),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      runtime.ensureConfigured(ctx.cwd);
+      runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
       const sprite = runtime.sprite();
       if (params.action === "status") return textResult(await rpcHostStatus(sprite));
       if (params.action === "install") return textResult((await installRpcHost(sprite)).join("\n") || "Pi RPC host installed.");

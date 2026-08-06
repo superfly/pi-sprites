@@ -8,10 +8,10 @@ import type {
 export type RuntimeMode = "auto" | "local" | "remote";
 export type CheckpointMode = "off" | "risky" | "turn";
 export type CleanupMode = "never" | "on-success" | "always";
+export type ToolActivationMode = "auto" | "always" | "off";
 
 export interface CheckpointConfig {
   mode?: CheckpointMode;
-  retention?: number;
 }
 
 export interface BootstrapConfig {
@@ -55,6 +55,7 @@ export interface PiSpritesConfig {
   remoteCwd?: string;
   baseURL?: string;
   tokenEnv?: string;
+  toolActivation?: ToolActivationMode;
   checkpoint?: CheckpointConfig;
   bootstrap?: BootstrapConfig;
   policy?: PolicyConfig;
@@ -75,4 +76,10 @@ export interface WorkerResult {
   exitCode: number;
   stdout: string;
   stderr: string;
+}
+
+export interface BootstrapResult {
+  sprite: import("@fly/sprites").Sprite;
+  remoteCwd: string;
+  report: string[];
 }

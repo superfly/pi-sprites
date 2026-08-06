@@ -7,6 +7,8 @@ description: Create, select, inspect, operate, and clean up persistent isolated 
 
 Use the native `sprite_*` tools and `/sprite-*` commands provided by this package. Do not replace them with hand-written `curl` calls or a second MCP integration.
 
+In the default activation mode, `sprite_*` tools appear after a Sprite is selected. If they are unavailable, use `/sprite-use <name>` or ask the user to opt in with `toolActivation: "always"`; slash commands remain available.
+
 ## Contexts
 
 - **Pi outside a Sprite:** after `sprite_manage` selects a Sprite, Pi's `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, and `!` commands operate in the remote workspace.
@@ -43,6 +45,6 @@ Use services for servers, databases, and daemons that must return after a cold b
 On a risky failure:
 
 1. Inspect current state and logs.
-2. Use `/sprite-diff <checkpoint>` if a checkpoint exists.
+2. Inspect current workspace and checkpoint metadata separately; no stable checkpoint-diff API is currently exposed.
 3. Preserve useful diagnostics.
 4. Ask before `/sprite-restore` or `/sprite-undo`.

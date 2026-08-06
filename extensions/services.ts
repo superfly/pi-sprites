@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { splitArgs } from "../src/args.js";
+import { registerRuntimeLifecycle } from "../src/extension.js";
 import { collectEvents, errorMessage, textResult } from "../src/output.js";
 import { runtime } from "../src/runtime.js";
 import { formatService, reconcileServices } from "../src/services.js";
@@ -62,10 +63,11 @@ async function serviceAction(action: string, args: string[], ctx: ExtensionConte
 }
 
 export default function servicesExtension(pi: ExtensionAPI): void {
+  registerRuntimeLifecycle(pi);
   pi.registerCommand("sprite-services", {
     description: "List services in the selected Sprite",
     handler: async (_input, ctx) => {
-      try { runtime.ensureConfigured(ctx.cwd); ctx.ui.notify(await listServices(), "info"); }
+      try { runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted()); ctx.ui.notify(await listServices(), "info"); }
       catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
     },
   });
@@ -74,7 +76,7 @@ export default function servicesExtension(pi: ExtensionAPI): void {
     description: "Create, inspect, operate, or reconcile a Sprite service",
     handler: async (input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         const [action = "list", ...args] = splitArgs(input);
         ctx.ui.notify(await serviceAction(action, args, ctx), "info");
       } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
@@ -101,7 +103,7 @@ export default function servicesExtension(pi: ExtensionAPI): void {
       lines: Type.Optional(Type.Number()),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      runtime.ensureConfigured(ctx.cwd);
+      runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
       const sprite = runtime.sprite();
       if (params.action === "list") return textResult(await listServices());
       if (params.action === "reconcile") {

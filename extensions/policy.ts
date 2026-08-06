@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import type { NetworkPolicy, PolicyRule } from "@fly/sprites";
 import { Type } from "typebox";
 import { splitArgs } from "../src/args.js";
+import { registerRuntimeLifecycle } from "../src/extension.js";
 import { errorMessage, textResult } from "../src/output.js";
 import { applyPolicies } from "../src/policy.js";
 import { runtime } from "../src/runtime.js";
@@ -50,11 +51,12 @@ async function policyAction(action: string, args: string[], ctx: ExtensionContex
 }
 
 export default function policyExtension(pi: ExtensionAPI): void {
+  registerRuntimeLifecycle(pi);
   pi.registerCommand("sprite-policy", {
     description: "Inspect or update Sprite network, privilege, and resource policies",
     handler: async (input, ctx) => {
       try {
-        runtime.ensureConfigured(ctx.cwd);
+        runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
         const [action = "show", ...args] = splitArgs(input);
         ctx.ui.notify(await policyAction(action, args, ctx), "info");
       } catch (error) { ctx.ui.notify(errorMessage(error), "error"); }
@@ -74,7 +76,7 @@ export default function policyExtension(pi: ExtensionAPI): void {
       domain: Type.Optional(Type.String()),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      runtime.ensureConfigured(ctx.cwd);
+      runtime.ensureConfigured(ctx.cwd, ctx.isProjectTrusted());
       const sprite = runtime.sprite();
       if (params.action === "get") {
         const [network, privileges, resources] = await Promise.all([

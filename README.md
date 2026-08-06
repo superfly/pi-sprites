@@ -59,16 +59,18 @@ pi --sprite pi-my-project --sprite-cwd /workspace/my-project
 
 | Extension | Main commands and tools |
 |---|---|
-| Core remote environment | `/sprite`, `/sprite-use`, `/sprite-new`, `/sprite-local`, `/sprite-proxy`, `sprite_manage` |
-| Transactional checkpoints | `/sprite-checkpoint`, `/sprite-checkpoints`, `/sprite-restore`, `/sprite-undo`, `sprite_checkpoint` |
-| Services | `/sprite-services`, `/sprite-service`, `sprite_service` |
-| Policies | `/sprite-policy`, `sprite_policy` |
-| Reproducible bootstrap | `/sprite-bootstrap`, `sprite_bootstrap` |
-| Retained CI | `/sprite-ci`, `sprite_ci` |
-| Worker pool | `/sprite-workers`, `sprite_workers` |
-| Durable Pi RPC host | `/sprite-rpc`, `sprite_rpc_host` |
+| [Core remote environment](./docs/core.md) | `/sprite`, `/sprite-use`, `/sprite-new`, `/sprite-local`, `/sprite-proxy`, `sprite_manage` |
+| [Transactional checkpoints](./docs/checkpoints.md) | `/sprite-checkpoint`, `/sprite-checkpoints`, `/sprite-restore`, `/sprite-undo`, `sprite_checkpoint` |
+| [Services](./docs/services.md) | `/sprite-services`, `/sprite-service`, `sprite_service` |
+| [Policies](./docs/policy.md) | `/sprite-policy`, `sprite_policy` |
+| [Reproducible bootstrap](./docs/bootstrap.md) | `/sprite-bootstrap`, `sprite_bootstrap` |
+| [Retained CI](./docs/ci.md) | `/sprite-ci`, `sprite_ci` |
+| [Worker pool](./docs/workers.md) | `/sprite-workers`, `sprite_workers` |
+| [Durable Pi RPC host](./docs/rpc-host.md) | `/sprite-rpc`, `sprite_rpc_host` |
 
 The extensions are separate manifest resources. Each feature module initializes configuration and session cleanup independently, so package filters can disable modules that a project does not need. Keep `core.ts` enabled for native tool routing and interactive Sprite selection; the other modules can also target a Sprite declared in configuration or operate from inside a Sprite without it.
+
+See the [extension guide](./docs/README.md) for prerequisites, configuration, command syntax, model-tool behavior, examples, and safety notes for every module. These are ordinary package documentation files rather than Pi prompt or skill resources, so reading them does not add them to model context.
 
 ## Project configuration
 

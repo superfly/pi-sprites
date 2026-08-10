@@ -10,6 +10,12 @@
     "type": "git",
     "url": "https://github.com/superfly/pi-sprites.git"
   },
+  "bugs": {
+    "url": "https://github.com/superfly/pi-sprites/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "pi-package",
     "pi",
@@ -29,13 +35,17 @@
     "templates",
     "runtime",
     "docs",
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
-    "test:e2e": "PI_SPRITES_E2E=1 node --import tsx --test test/e2e.live.test.ts",
+    "test:e2e": "node --import tsx --test test/e2e.live.test.ts",
     "check": "npm run build && npm test",
     "pack:check": "npm pack --dry-run"
   },

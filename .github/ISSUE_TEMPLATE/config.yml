@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: mailto:security@fly.io
+    about: Report vulnerabilities privately; do not open a public issue.
+  - name: General Sprites support
+    url: https://community.fly.io/
+    about: Ask product and platform questions in the Fly.io community.

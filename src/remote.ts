@@ -82,10 +82,9 @@ export function createRemoteFindOps(sprite: Sprite): FindOperations {
 
 export function createRemoteBashOps(sprite: Sprite): BashOperations {
   return {
-    exec: (command, cwd, { onData, signal, timeout, env }) => new Promise((resolve, reject) => {
+    exec: (command, cwd, { onData, signal, timeout }) => new Promise((resolve, reject) => {
       const child = sprite.spawn("/bin/bash", ["-lc", command], {
         cwd: toRemoteCwd(cwd),
-        env: Object.fromEntries(Object.entries(env ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === "string")),
       });
       let timedOut = false;
       const timer = timeout && timeout > 0 ? setTimeout(() => {

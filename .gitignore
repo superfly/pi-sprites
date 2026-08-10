@@ -2,5 +2,9 @@ node_modules/
 dist/
 coverage/
 *.tgz
+*.log
 .DS_Store
+.env
+.env.*
+!.env.example
 .pi/sprites.local.json

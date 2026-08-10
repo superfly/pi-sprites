@@ -4,14 +4,25 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # Build + unit tests. Always runs, needs no secrets.
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: npm
@@ -20,15 +31,21 @@ jobs:
 
   # Live end-to-end tests against real Sprites.
   # Uses the "pi" GitHub Environment, which holds the SPRITES_TOKEN secret.
-  # The test self-skips if the token is absent (e.g. on forked-PR runs that
-  # cannot access environment secrets), and cleans up any Sprites it creates.
+  # Pull-request code never reaches this job. The test cleans up the labeled
+  # Sprite it creates and stale labeled environments from interrupted runs.
   e2e:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: pi
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: npm

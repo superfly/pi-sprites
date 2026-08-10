@@ -1,10 +1,21 @@
 # pi-sprites
 
+[![CI](https://github.com/superfly/pi-sprites/actions/workflows/ci.yml/badge.svg)](https://github.com/superfly/pi-sprites/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 First-class [Sprites](https://sprites.dev) environments for the [Pi coding agent](https://pi.dev).
 
 `pi-sprites` can route Pi's native filesystem and shell tools into a persistent, isolated Sprite, then add checkpointing, services, policy management, reproducible bootstrap, retained CI, worker pools, and a durable Pi RPC host. One Pi package installs the extensions, skills, and prompt templates together.
 
 ## Install
+
+Until the first npm release, install directly from GitHub:
+
+```bash
+pi install git:github.com/superfly/pi-sprites
+```
+
+After `pi-sprites` is published to npm:
 
 ```bash
 pi install npm:pi-sprites
@@ -68,7 +79,7 @@ pi --sprite pi-my-project --sprite-cwd /workspace/my-project
 | [Worker pool](./docs/workers.md) | `/sprite-workers`, `sprite_workers` |
 | [Durable Pi RPC host](./docs/rpc-host.md) | `/sprite-rpc`, `sprite_rpc_host` |
 
-The extensions are separate manifest resources. Each feature module initializes configuration and session cleanup independently, so package filters can disable modules that a project does not need. Keep `core.ts` enabled for native tool routing and interactive Sprite selection; the other modules can also target a Sprite declared in configuration or operate from inside a Sprite without it.
+The extensions are separate manifest resources. Each feature module initializes configuration and session cleanup independently, so package filters can disable modules that a project does not need. Keep `core.ts` enabled for native tool routing and interactive Sprite selection; the other modules can target a Sprite declared in configuration without loading core. Checkpoints additionally support Pi running inside a Sprite through `sprite-env`.
 
 See the [extension guide](./docs/README.md) for prerequisites, configuration, command syntax, model-tool behavior, examples, and safety notes for every module. These are ordinary package documentation files rather than Pi prompt or skill resources, so reading them does not add them to model context.
 
@@ -159,9 +170,25 @@ Pi packages execute with the user's full permissions. Review package source befo
 ## Development
 
 ```bash
-npm install
+npm ci
 npm run check
 npm run pack:check
 ```
 
 The package depends on [`@fly/sprites`](https://www.npmjs.com/package/@fly/sprites) for all Sprites transport and API operations, and uses Pi's public extension operation interfaces for native tool routing.
+
+Live tests create real Sprites and require an explicit token:
+
+```bash
+SPRITES_TOKEN='...' npm run test:e2e
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the development workflow and [docs/automated-testing.md](./docs/automated-testing.md) for test isolation and cleanup details.
+
+## Community and security
+
+- Use [GitHub Issues](https://github.com/superfly/pi-sprites/issues) for reproducible bugs and focused feature requests.
+- Read [SECURITY.md](./SECURITY.md) and report vulnerabilities privately to `security@fly.io`; do not open a public issue.
+- Participation is governed by our [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+`pi-sprites` is available under the [MIT License](./LICENSE).

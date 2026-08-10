@@ -13,6 +13,12 @@
 | [Worker pool](./workers.md) | Fan shell jobs or Pi prompts out across isolated Sprites. |
 | [Durable Pi RPC host](./rpc-host.md) | Run Pi RPC mode as a Sprite service and connect through HTTP/SSE. |
 
+Testing guides:
+
+- [Automated testing](./automated-testing.md)
+- [Manual test plan](./manual-test-plan.md)
+- [Release process](./releasing.md)
+
 ## How Pi treats these files
 
 Pi packages have runtime resource types for extensions, skills, prompts, and themes. There is no separate documentation resource type. These Markdown files are shipped in the npm package and linked from the top-level README, but are deliberately absent from the `pi` manifest. Pi therefore does not load them as prompts or place them in model context.
@@ -23,7 +29,7 @@ Commands beginning with `/sprite-` are always available when their extension is 
 
 - Node.js 24 or later.
 - A Sprites token in `SPRITES_TOKEN`, `SPRITE_TOKEN`, or the variable named by `tokenEnv`.
-- A selected Sprite for extensions that operate on the current environment. Bootstrap, CI, and workers can provision explicitly named Sprites without changing the user's selection.
+- A selected or configured Sprite for extensions that operate on the current environment. Checkpoints can also use `sprite-env` when Pi itself runs inside a Sprite. Bootstrap, CI, and workers can provision explicitly named Sprites without changing the user's selection.
 - Project trust before `.pi/sprites.json` or `.pi/sprites.local.json` is honored. Global `~/.pi/agent/sprites.json` remains available outside a trusted project.
 
 Start with the configuration template at [`templates/sprites.json`](../templates/sprites.json).
@@ -46,4 +52,4 @@ Pi package filters can narrow the extension list. For example, this project sett
 }
 ```
 
-Keep `core.ts` when you want native `read`, `write`, `edit`, `bash`, `grep`, `find`, and `ls` routing or interactive selection. Other modules initialize configuration and cleanup independently and can use a Sprite named in configuration or run from inside a Sprite.
+Keep `core.ts` when you want native `read`, `write`, `edit`, `bash`, `grep`, `find`, and `ls` routing or interactive selection. Other modules initialize configuration and cleanup independently and can use a Sprite named in configuration. The checkpoints module also has an inside-Sprite `sprite-env` path.

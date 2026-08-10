@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a focused improvement to pi-sprites
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is difficult today, and who encounters it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-facing commands, tools, or configuration you would expect.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and compatibility
+      description: Note effects on project trust, credentials, routing, destructive actions, public endpoints, and existing configuration.

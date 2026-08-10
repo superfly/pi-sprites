@@ -17,17 +17,19 @@ real Sprite. It is the automated counterpart to the manual plan.
 
 ```bash
 export SPRITES_TOKEN='...'
-npm run test:e2e            # sets PI_SPRITES_E2E=1 for you
+npm run test:e2e            # the dedicated script is the opt-in
 ```
 
-Without `PI_SPRITES_E2E=1` (or without a token) the test self-skips, so it is
-safe to leave in the default `npm test` run — it appears as `skipped`.
+Running `npm run test:e2e` is itself the opt-in. When the file is reached by the
+default `npm test` run, it self-skips unless `PI_SPRITES_E2E=1` is set. It also
+self-skips without a token.
 
 **Cleanup:** the test destroys its own Sprite in an `after` hook regardless of
-outcome, and additionally sweeps any stale `pi-e2e-*` Sprites older than an hour
-left behind by interrupted runs. Creating Sprites is cheap — they sleep when
-idle — but the suite still removes everything it makes so CI never accumulates
-environments.
+outcome, and additionally sweeps stale `pi-e2e-*` Sprites older than an hour
+that carry the dedicated `pi-sprites-e2e` label. The name and label checks keep
+the sweep from touching unrelated environments. Creating Sprites is cheap —
+they sleep when idle — but the suite still removes everything it makes so CI
+never accumulates environments.
 
 What it covers, mirroring the manual sections:
 
@@ -55,8 +57,9 @@ with two jobs:
 
 - **`check`** — `npm run check` (build + unit tests). Always runs, needs no
   secrets, so it works on forked pull requests.
-- **`e2e`** — `npm run test:e2e` against real Sprites. It runs whenever the
-  `SPRITES_TOKEN` secret is available, and self-skips cleanly when it is not.
+- **`e2e`** — `npm run test:e2e` against real Sprites. It runs only after a
+  trusted push to `main` or a manual workflow dispatch. It never runs for a
+  pull-request event, including same-repository pull requests.
 
 The `e2e` job reads its token from a GitHub **Environment** named `pi` (see
 below), so no token is needed for the live test to be a no-op on untrusted runs.
@@ -78,10 +81,10 @@ environment rather than at the repository level. To set it up:
    environment — for example, restrict it to `main` — so the token is only
    exposed to trusted runs and never to forked-PR builds.
 
-Because environment secrets are not exposed to workflows triggered from forks,
-fork pull requests run `check` normally while the live `e2e` job simply
-self-skips. Push and same-repo pull-request runs on the allowed branches get the
-token and execute the full live suite.
+Pull requests run `check` normally, but the workflow skips the entire `e2e` job
+before requesting the environment. This is intentionally stricter than relying
+on GitHub's fork-secret behavior: unmerged pull-request code never receives the
+token. Trusted `main` pushes and manual dispatches execute the live suite.
 
 ## Approach B — Headless Pi driving the model tools
 

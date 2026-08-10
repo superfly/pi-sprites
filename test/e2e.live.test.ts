@@ -136,6 +136,6 @@ test("live e2e", { skip: !enabled || !token ? "set PI_SPRITES_E2E=1 and SPRITES_
   });
 
   // Note: CI (runCi) and workers (runWorkers) provision *additional* Sprites
-  // named from the project + branch/index. Enable them with PI_SPRITES_E2E_HEAVY=1
-  // and ensure your cleanup budget can afford the extra environments.
+  // named from the project + branch/index. They are deliberately outside this
+  // suite; add dedicated coverage and cleanup before exercising them live.
 });

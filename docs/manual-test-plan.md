@@ -21,20 +21,24 @@ logic. This plan covers the interactive experience those tests cannot.
   ```bash
   export SPRITES_TOKEN='...'
   ```
-- This checkout installed, and a scratch Git project to point bootstrap/CI at.
+- This checkout with `npm ci` completed, and a scratch Git project whose
+  `origin` is reachable from a Sprite without copying local credentials. Its
+  configured CI commands should be safe to run.
 - A throwaway Sprite name to avoid touching real work, e.g. `pi-sprites-test`.
 
-Launch Pi with all extensions from this checkout:
+From the scratch project, set the checkout path and launch Pi with all
+extensions:
 
 ```bash
-pi -e ./extensions/core.ts \
-   -e ./extensions/checkpoints.ts \
-   -e ./extensions/services.ts \
-   -e ./extensions/policy.ts \
-   -e ./extensions/bootstrap.ts \
-   -e ./extensions/ci.ts \
-   -e ./extensions/workers.ts \
-   -e ./extensions/rpc-host.ts
+PI_SPRITES_CHECKOUT=/absolute/path/to/pi-sprites
+pi -e "$PI_SPRITES_CHECKOUT/extensions/core.ts" \
+   -e "$PI_SPRITES_CHECKOUT/extensions/checkpoints.ts" \
+   -e "$PI_SPRITES_CHECKOUT/extensions/services.ts" \
+   -e "$PI_SPRITES_CHECKOUT/extensions/policy.ts" \
+   -e "$PI_SPRITES_CHECKOUT/extensions/bootstrap.ts" \
+   -e "$PI_SPRITES_CHECKOUT/extensions/ci.ts" \
+   -e "$PI_SPRITES_CHECKOUT/extensions/workers.ts" \
+   -e "$PI_SPRITES_CHECKOUT/extensions/rpc-host.ts"
 ```
 
 Cleanup is at the end. Nothing here enables public URLs or copies credentials.
@@ -45,14 +49,15 @@ Cleanup is at the end. Nothing here enables public URLs or copies credentials.
 
 | Step | Action | Expect |
 |---|---|---|
-| 1.1 | `/sprite status` | Reports local mode, no Sprite selected. |
+| 1.1 | `/sprite status` | Reports the current mode. With no global `sprite` configured, this is local mode with no selection. |
 | 1.2 | `/sprite list` | Lists your Sprites (or empty). Confirms auth works. |
-| 1.3 | `/sprite new pi-sprites-test` | Creates and selects the Sprite. |
-| 1.4 | `!pwd` | Runs in the **remote** Sprite, prints `remoteCwd` (`/workspace/pi-sprites-test`). |
-| 1.5 | `write` a file `hello.txt` with some text | File is created remotely. |
-| 1.6 | `read hello.txt` / `ls` | Shows the remote file. Confirms `read`/`write`/`ls` are routed. |
-| 1.7 | `/sprite-local` then `!pwd` | Returns to your **local** machine's cwd. |
-| 1.8 | `/sprite-use pi-sprites-test` then `ls` | Back on the remote workspace, file still present. |
+| 1.3 | `/sprite new pi-sprites-test` | Creates and selects the Sprite. Its initial `remoteCwd` is derived from the local project unless configured. |
+| 1.4 | `/sprite-use pi-sprites-test /workspace/pi-sprites-test` | Selects an explicit test working directory. |
+| 1.5 | `!mkdir -p /workspace/pi-sprites-test` then `!pwd` | Creates the workspace and prints `/workspace/pi-sprites-test` from the **remote** Sprite. |
+| 1.6 | Ask Pi to write a file `hello.txt` with some text | The `write` tool creates the file remotely. |
+| 1.7 | Ask Pi to read `hello.txt` and list the directory | The `read` and `ls` tools show the remote file. |
+| 1.8 | `/sprite-local` then `!pwd` | Returns to your **local** machine's cwd. |
+| 1.9 | `/sprite-use pi-sprites-test /workspace/pi-sprites-test` then ask Pi to list the directory | Back in the remote workspace, the file is still present. |
 
 **Pass criteria:** native tools transparently switch between local and remote,
 and selection survives within the session.
@@ -79,7 +84,7 @@ asks for confirmation; the model cannot restore.
 
 | Step | Action | Expect |
 |---|---|---|
-| 3.1 | `/sprite-service create web npm run dev` (or any simple command that stays up) | Service definition created in `remoteCwd`. |
+| 3.1 | `/sprite-service create web python3 -m http.server 3000` | Creates a long-running service in `remoteCwd` without relying on project-specific scripts. |
 | 3.2 | `/sprite-services` | Lists services with status. |
 | 3.3 | `/sprite-service logs web 200` | Streams recent logs. |
 | 3.4 | `/sprite-service restart web` | Restarts cleanly. |
@@ -108,15 +113,16 @@ confirms; empty rules == unrestricted (not deny-all).
 
 ## 5. Bootstrap: reproducible environment
 
-Point config at a real repo first. Create `.pi/sprites.json` (see
-`templates/sprites.json`) and set `bootstrap.repository`, `branch`, and safe,
-repeatable `commands`. **Trust the project** in Pi so config is honored.
+Point config at the scratch repo first. Create `.pi/sprites.json` (see
+`templates/sprites.json`), set `remoteCwd` to `/workspace/pi-sprites-test`, and
+set `bootstrap.repository`, `branch`, and safe, repeatable `commands`.
+**Trust the project** in Pi so config is honored.
 
 | Step | Action | Expect |
 |---|---|---|
 | 5.1 | `/sprite-bootstrap pi-sprites-test` | Reuses the Sprite, clones repo if no `.git`, checks out branch, runs trusted commands, applies policy, creates services, checkpoints. |
 | 5.2 | Re-run `/sprite-bootstrap pi-sprites-test` | Idempotent: reuses checkout, only creates missing services, reapplies policy. |
-| 5.3 | `/sprite-use pi-sprites-test /workspace/<project>` | Point native tools at the bootstrapped tree. |
+| 5.3 | `/sprite-use pi-sprites-test /workspace/pi-sprites-test` | Point native tools at the configured bootstrapped tree. |
 | 5.4 | `/sprite-services` and `/sprite-checkpoints` | Show the reconciled services and known-good checkpoint. |
 
 **Pass criteria:** bootstrap converges, is safe to repeat, refuses commands
@@ -161,12 +167,13 @@ uncommitted changes; your selection is untouched.
 | 8.2 | `/sprite-rpc status` | Reports service state and internal port. |
 | 8.3 | `/sprite-rpc proxy` | Session-scoped local TCP proxy. |
 | 8.4 | `curl localhost:43120/health` | Returns healthy. |
-| 8.5 | `curl -XPOST localhost:43120/rpc -d '{...}'` | Round-trips a JSON-line RPC request. |
+| 8.5 | `curl -sS -H 'Content-Type: application/json' -d '{"type":"get_state"}' http://localhost:43120/rpc` | Sends one JSON command over HTTP and returns its correlated Pi RPC response. |
 | 8.6 | `/sprite-rpc remove`, confirm | Deletes the service (session data remains). |
 
 **Pass criteria:** host installs as a service, is reachable only via local proxy
 by default, and removal confirms. (Only test `httpPort` + bearer secret if you
-explicitly want public HTTP routing.)
+explicitly want routing through the Sprite URL. Making that URL public is a
+separate platform setting and is not part of this plan.)
 
 ---
 
@@ -182,9 +189,13 @@ selection.
 
 ## 10. Session reset behavior
 
-Start a new/resumed/forked Pi session and run `/sprite status`: selection,
-proxies, and last-checkpoint state must reset. This guards against a stale
-session silently operating on the wrong environment.
+Select a Sprite other than the one declared in configuration, then start a new,
+resumed, or forked Pi session and run `/sprite status`. The transient selection
+must reset to the newly loaded configuration (or to no selection if none is
+configured), rather than carrying over the prior session's choice. Proxies are
+closed, and `/sprite-undo` must report that Pi has not created a checkpoint in
+the new session. This guards against stale state silently targeting the wrong
+environment.
 
 ---
 
@@ -206,7 +217,7 @@ no longer shows the test Sprites.
 | Extension | Covered by |
 |---|---|
 | Core | §1, §9, §10 |
-| Checkpoints | §2, plus auto checkpoints in §5/§6 |
+| Checkpoints | §2, plus bootstrap and CI failure checkpoints in §5/§6 |
 | Services | §3, §5.4 |
 | Policy | §4, §5.1 |
 | Bootstrap | §5, and reused by §6/§7 |

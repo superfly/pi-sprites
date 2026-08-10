@@ -44,7 +44,9 @@ Services live under `bootstrap.services` because bootstrap reconciles them as pa
 
 `/sprite-service reconcile` creates missing configured services. Existing services with the same name are left unchanged; reconciliation does not update or delete them.
 
-`httpPort` exposes the service through the Sprite's HTTP routing. Omit it when the service should be reachable only inside the Sprite or through `/sprite-proxy`.
+`httpPort` routes the service through the Sprite URL. It does not make that URL public: Sprites use authenticated `sprite` URL access by default, and changing the URL to `public` is a separate, explicit platform setting. Omit `httpPort` when the service should be reachable only inside the Sprite or through `/sprite-proxy`.
+
+`duration` controls how long service output is monitored during creation; it is not a service lifetime. The service manager continues running the process after that monitoring window.
 
 ## Model tool
 

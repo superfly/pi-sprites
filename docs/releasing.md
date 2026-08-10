@@ -1,6 +1,6 @@
 # Future npm releases
 
-`pi-sprites` is not currently published to npm, and this repository does not contain an active npm publishing workflow. Users should install directly from GitHub until maintainers announce otherwise.
+`pi-sprites` is not currently published to npm, and this repository does not contain an active npm publishing workflow. Until maintainers announce otherwise, install directly from GitHub; while the repository is not public, this requires existing GitHub access.
 
 ```bash
 pi install git:github.com/superfly/pi-sprites

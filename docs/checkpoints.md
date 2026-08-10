@@ -31,8 +31,8 @@ A selected Sprite is required unless Pi itself is running inside a Sprite, where
 Modes are:
 
 - `off`: no automatic checkpoints.
-- `risky` (default): once per turn, before the first write, edit, recognized destructive shell command, or mutating service, policy, or RPC-host tool call.
-- `turn`: once per turn before the first mutating tool call.
+- `risky` (default): once per turn, before the first write, edit, recognized destructive shell command, or service, policy, or RPC-host model-tool call. Those three model tools are conservatively treated as risky for every action, including inspection.
+- `turn`: once per turn before the first tool call, whether or not that tool is expected to mutate state.
 
 If a required automatic checkpoint fails, the mutation is blocked rather than allowed to continue without a recovery point.
 
@@ -44,6 +44,6 @@ Bootstrap, CI, and worker tool calls do not checkpoint the user's selected Sprit
 
 ## Limitations
 
-Checkpoint deletion and filesystem diff are not implemented. Those operations currently require SDK internals or an unstable on-disk layout; `pi-sprites` waits for stable public SDK APIs instead.
+Checkpoint deletion and filesystem diff are not implemented. The installed public JavaScript SDK does not expose those operations, and implementing them would require a hand-written API call or an unstable on-disk layout. `pi-sprites` avoids both.
 
 Restoring may terminate active processes and sessions. Services should restart according to the Sprite service manager, but arbitrary foreground processes will not be recreated.

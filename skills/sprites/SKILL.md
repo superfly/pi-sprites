@@ -12,7 +12,7 @@ In the default activation mode, `sprite_*` tools appear after a Sprite is select
 ## Contexts
 
 - **Pi outside a Sprite:** after `sprite_manage` selects a Sprite, Pi's `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, and `!` commands operate in the remote workspace.
-- **Pi inside a Sprite:** normal tools are already local to the Sprite. Use checkpoint, service, policy, and connector workflows without selecting the same Sprite remotely.
+- **Pi inside a Sprite:** normal tools are already local to the Sprite. Checkpoints can use the local `sprite-env` path, and connector requests can originate directly inside the Sprite. Service and policy tools still require a configured Sprite target and API token.
 
 Always state which context is active before assuming a filesystem is local or remote. Use `sprite_manage` with `action: "status"` when uncertain.
 

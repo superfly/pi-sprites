@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Sprite } from "@fly/sprites";
-import { createRemoteEditOps, createRemoteLsOps, createRemoteReadOps, createRemoteWriteOps } from "../src/remote.js";
+import {
+  createRemoteBashOps,
+  createRemoteEditOps,
+  createRemoteLsOps,
+  createRemoteReadOps,
+  createRemoteWriteOps,
+} from "../src/remote.js";
 
 test("remote filesystem operations delegate to the Sprites SDK", async () => {
   const calls: unknown[][] = [];
@@ -20,4 +26,33 @@ test("remote filesystem operations delegate to the Sprites SDK", async () => {
   await createRemoteEditOps(sprite).access("/b");
   assert.deepEqual(await createRemoteLsOps(sprite).readdir("/"), ["a.ts"]);
   assert.deepEqual(calls.map((call) => call[0]), ["read", "write", "stat", "readdir"]);
+});
+
+test("remote bash does not copy the local process environment into a Sprite", async () => {
+  let spawnOptions: Record<string, unknown> | undefined;
+  const child = {
+    stdout: { on: () => undefined },
+    stderr: { on: () => undefined },
+    on: () => undefined,
+    wait: async () => 0,
+    kill: () => undefined,
+  };
+  const sprite = {
+    spawn: (_command: string, _args: string[], options: Record<string, unknown>) => {
+      spawnOptions = options;
+      return child;
+    },
+  } as unknown as Sprite;
+
+  await createRemoteBashOps(sprite).exec("env", process.cwd(), {
+    onData: () => undefined,
+    env: {
+      PATH: process.env.PATH,
+      SPRITES_TOKEN: "must-not-leave-the-local-process",
+      GITHUB_TOKEN: "must-not-leave-the-local-process",
+    },
+  });
+
+  assert.ok(spawnOptions);
+  assert.equal("env" in spawnOptions, false);
 });

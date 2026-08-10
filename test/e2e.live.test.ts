@@ -30,10 +30,11 @@ import { installRpcHost, rpcHostStatus } from "../src/rpc-host.js";
 import { runtime } from "../src/runtime.js";
 import { reconcileServices } from "../src/services.js";
 
-const enabled = process.env.PI_SPRITES_E2E === "1";
+const enabled = process.env.PI_SPRITES_E2E === "1" || process.env.npm_lifecycle_event === "test:e2e";
 const token = process.env.SPRITES_TOKEN || process.env.SPRITE_TOKEN;
 const runId = `pi-e2e-${Date.now().toString(36)}`;
 const REMOTE_CWD = `/workspace/${runId}`;
+const E2E_LABEL = "pi-sprites-e2e";
 
 // Minimal ExtensionAPI stand-in. bootstrap/ci/workers only call pi.exec for git
 // (`git config --get remote.origin.url`, `git branch --show-current`). Returning
@@ -67,7 +68,7 @@ test("live e2e", { skip: !enabled || !token ? "set PI_SPRITES_E2E=1 and SPRITES_
       const cutoff = Date.now() - 60 * 60 * 1000; // older than 1h
       for (const s of all) {
         const match = /^pi-e2e-([0-9a-z]+)$/.exec(s.name);
-        if (!match || s.name === runId) continue;
+        if (!match || s.name === runId || !s.labels.includes(E2E_LABEL)) continue;
         const created = Number.parseInt(match[1] ?? "", 36);
         if (Number.isFinite(created) && created < cutoff) {
           await client.deleteSprite(s.name).catch(() => {});
@@ -80,7 +81,11 @@ test("live e2e", { skip: !enabled || !token ? "set PI_SPRITES_E2E=1 and SPRITES_
   });
 
   await t.test("core: create Sprite", async () => {
-    sprite = await client.createSprite(runId, { runtime: "dev", waitForCapacity: true });
+    sprite = await client.createSprite(runId, {
+      runtime: "dev",
+      waitForCapacity: true,
+      labels: [E2E_LABEL],
+    });
     await sprite.execFile("mkdir", ["-p", REMOTE_CWD]);
     const found = await client.getSprite(runId);
     assert.equal(found.name, runId);

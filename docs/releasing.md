@@ -1,20 +1,25 @@
-# Releasing pi-sprites
+# Future npm releases
 
-Releases are published from GitHub Actions with npm trusted publishing. The workflow uses short-lived OIDC credentials and stores no long-lived npm write token in GitHub.
+`pi-sprites` is not currently published to npm, and this repository does not contain an active npm publishing workflow. Users should install directly from GitHub until maintainers announce otherwise.
 
-## One-time setup
+```bash
+pi install git:github.com/superfly/pi-sprites
+```
 
-The `pi-sprites` npm name is not yet published. A package owner must claim it with the initial public publish, then configure trusted publishing for subsequent releases:
+## Deferred setup checklist
+
+When npm publishing becomes available, a package owner should:
 
 1. Make this GitHub repository public.
 2. From a clean, reviewed `main` checkout, run `npm ci`, `npm run check`, and `npm run pack:check`.
-3. Authenticate to the intended Fly.io npm owner account and publish `0.1.0` with `npm publish`. The package's `publishConfig` makes it public.
-4. In the npm package settings, configure a GitHub Actions trusted publisher with:
+3. Confirm ownership of the intended unscoped `pi-sprites` npm name and perform the initial public publish through the approved Fly.io npm account.
+4. Add a reviewed `.github/workflows/publish.yml` that validates the release tag, runs checks, and invokes `npm publish` with OIDC permissions.
+5. In the npm package settings, configure a GitHub Actions trusted publisher with:
    - organization: `superfly`
    - repository: `pi-sprites`
    - workflow filename: `publish.yml`
    - allowed action: `npm publish`
-5. Remove or restrict traditional npm automation tokens after the trusted publisher succeeds.
+6. Remove or restrict traditional npm automation tokens after the trusted publisher succeeds.
 
 Do not add an `NPM_TOKEN` secret to this repository. Trusted publishing automatically attaches npm provenance when both the repository and package are public.
 
@@ -23,8 +28,6 @@ Do not add an `NPM_TOKEN` secret to this repository. Trusted publishing automati
 1. Update `version` in `package.json` and `package-lock.json`.
 2. Move the relevant entries from `Unreleased` in `CHANGELOG.md` into a versioned section with the release date.
 3. Open and merge a pull request after CI passes.
-4. Publish a GitHub release whose tag is exactly `v<package-version>`.
+4. Publish a GitHub release whose tag is exactly `v<package-version>` after the trusted-publishing workflow is configured.
 
-The [publish workflow](../.github/workflows/publish.yml) verifies that the release tag matches `package.json`, installs the locked dependencies, runs the full local check and package dry run, then calls `npm publish`. npm trusted publishing supplies the short-lived credential and provenance.
-
-The gated live Sprites test runs on the trusted `main` push before release. It is not rerun by the publish workflow so the npm release path needs no Sprites credential.
+The gated live Sprites test already runs on trusted `main` pushes. A future publish workflow should rely on that result rather than requiring a Sprites credential in the npm release path.

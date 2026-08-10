@@ -13,9 +13,6 @@
   "bugs": {
     "url": "https://github.com/superfly/pi-sprites/issues"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "keywords": [
     "pi-package",
     "pi",

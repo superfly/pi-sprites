@@ -35,6 +35,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
+    "test:e2e": "PI_SPRITES_E2E=1 node --import tsx --test test/e2e.live.test.ts",
     "check": "npm run build && npm test",
     "pack:check": "npm pack --dry-run"
   },

@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Build + unit tests. Always runs, needs no secrets.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+
+  # Live end-to-end tests against real Sprites.
+  # Uses the "pi" GitHub Environment, which holds the SPRITES_TOKEN secret.
+  # The test self-skips if the token is absent (e.g. on forked-PR runs that
+  # cannot access environment secrets), and cleans up any Sprites it creates.
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: pi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Live Sprite integration tests
+        run: npm run test:e2e
+        env:
+          SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}

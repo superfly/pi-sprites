@@ -21,7 +21,7 @@ Testing guides:
 
 ## How Pi treats these files
 
-Pi packages have runtime resource types for extensions, skills, prompts, and themes. There is no separate documentation resource type. These Markdown files are shipped in the npm package and linked from the top-level README, but are deliberately absent from the `pi` manifest. Pi therefore does not load them as prompts or place them in model context.
+Pi packages have runtime resource types for extensions, skills, prompts, and themes. There is no separate documentation resource type. These Markdown files are shipped with the package and linked from the top-level README, but are deliberately absent from the `pi` manifest. Pi therefore does not load them as prompts or place them in model context. See Pi's [package documentation](https://pi.dev/docs/latest/packages) for the resource and filtering model.
 
 Commands beginning with `/sprite-` are always available when their extension is loaded and are initiated by the user. Tools named `sprite_*` are callable by the model. With the default `toolActivation: "auto"`, those model tools become active only after a Sprite is selected or when Pi itself is running inside a Sprite. See [Core remote environment](./core.md#model-tool-activation) for the other activation modes.
 
@@ -30,19 +30,19 @@ Commands beginning with `/sprite-` are always available when their extension is 
 - Node.js 24 or later.
 - A Sprites token in `SPRITES_TOKEN`, `SPRITE_TOKEN`, or the variable named by `tokenEnv`.
 - A selected or configured Sprite for extensions that operate on the current environment. Checkpoints can also use `sprite-env` when Pi itself runs inside a Sprite. Bootstrap, CI, and workers can provision explicitly named Sprites without changing the user's selection.
-- Project trust before `.pi/sprites.json` or `.pi/sprites.local.json` is honored. Global `~/.pi/agent/sprites.json` remains available outside a trusted project.
+- Project trust before `.pi/sprites.json` or `.pi/sprites.local.json` is honored. Global `~/.pi/agent/sprites.json` remains available outside a trusted project. Add `.pi/sprites.local.json` to the consuming project's `.gitignore` before using it for local-only values.
 
 Start with the configuration template at [`templates/sprites.json`](../templates/sprites.json).
 
 ## Filtering extensions
 
-Pi package filters can narrow the extension list. For example, this project setting keeps only core routing and checkpoints:
+Pi package filters can narrow the extension list. For example, this entry in the project's `.pi/settings.json` keeps only core routing and checkpoints for the current Git installation:
 
 ```json
 {
   "packages": [
     {
-      "source": "npm:pi-sprites",
+      "source": "git:github.com/superfly/pi-sprites",
       "extensions": [
         "+extensions/core.ts",
         "+extensions/checkpoints.ts"

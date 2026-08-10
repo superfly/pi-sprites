@@ -97,13 +97,16 @@ export SPRITES_TOKEN='...'
 pi -p --no-session \
    -e ./extensions/core.ts -e ./extensions/checkpoints.ts \
    -e ./extensions/services.ts -e ./extensions/policy.ts \
-   "Create a Sprite named agent-smoke, write /workspace/agent-smoke/ok.txt, \
-    read it back, create a checkpoint, then destroy the Sprite."
+   "Create a Sprite named agent-smoke, select /workspace/agent-smoke as its \
+    working directory, write ok.txt, read it back, create a checkpoint, and \
+    report the Sprite name for manual cleanup."
 ```
 
 This is the closest match to "an agent does the testing," but it is
 non-deterministic (results depend on the model). Use it for exploratory or
 acceptance-style checks, and Approach A for deterministic regression gating.
+Destruction is intentionally unavailable to model tools; clean up afterward in
+an interactive Pi session with `/sprite-destroy agent-smoke` and confirm it.
 
 ## Approach C — Drive a durable Pi over RPC
 
@@ -115,8 +118,9 @@ host and talk to it over HTTP:
 /sprite-rpc proxy
 ```
 
-Then `POST /rpc` with JSON-line requests, subscribe to `GET /events`, and poll
-`GET /health`. See [rpc-host.md](./rpc-host.md). This is useful when the tester is
+Then send one JSON command object in each `POST /rpc` HTTP body, subscribe to
+`GET /events`, and poll `GET /health`. The host handles JSONL framing toward the
+Pi child process. See [rpc-host.md](./rpc-host.md). This is useful when the tester is
 itself an autonomous agent that needs a persistent session rather than one-shot
 prompts.
 

@@ -26,7 +26,7 @@ The bundled service exposes:
 - `POST /rpc`
 - `GET /events` for server-sent events
 
-The host translates HTTP requests to Pi's JSON-line RPC process. Create a local connection with:
+The host accepts one JSON command in each HTTP `POST /rpc` body and translates it to Pi's LF-delimited JSONL process protocol. Create a local connection with:
 
 ```text
 /sprite-rpc install
@@ -34,6 +34,19 @@ The host translates HTTP requests to Pi's JSON-line RPC process. Create a local 
 ```
 
 By default this is available only through the local proxy.
+
+For example, after proxying to the default local port:
+
+```bash
+curl -sS http://localhost:43120/health
+curl -sS -H 'Content-Type: application/json' \
+  -d '{"type":"get_state"}' \
+  http://localhost:43120/rpc
+```
+
+Pi emits asynchronous agent events separately; subscribe to `GET /events` as
+server-sent events. See Pi's [RPC protocol](https://pi.dev/docs/latest/rpc) for
+the supported command objects and event types.
 
 ## Configuration
 
@@ -54,14 +67,14 @@ By default this is available only through the local proxy.
 - `httpPort`: optional Sprite HTTP port declaration. Omitted by default.
 - `secretEnv`: local environment variable containing the bearer secret, default `PI_SPRITES_RPC_SECRET`.
 
-## Public HTTP safety
+## Sprite URL safety
 
-Setting `httpPort` opts into Sprite HTTP routing. Installation then requires the environment variable named by `secretEnv` and passes its value to the remote service as `PI_SPRITES_RPC_SECRET`. Clients must send:
+Setting `httpPort` opts into routing the service through the Sprite URL. It does not change that URL's platform access mode; Sprites default to authenticated `sprite` access, while changing a URL to `public` is a separate operation. As an additional application-level control, installation requires the environment variable named by `secretEnv` and passes its value to the remote service as `PI_SPRITES_RPC_SECRET`. Clients must send:
 
 ```text
 Authorization: Bearer <secret>
 ```
 
-The secret is copied into this service only when HTTP exposure is configured. Rotate it by changing the local value and running `/sprite-rpc install` again.
+The secret is copied into this service whenever it is present, and it is required when `httpPort` is configured. Rotate it by changing the local value and running `/sprite-rpc install` again.
 
 The local proxy itself does not add authentication. Treat its listening address as access to the Pi session and close the Pi session when the proxy is no longer needed.

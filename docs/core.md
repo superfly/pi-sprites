@@ -10,7 +10,7 @@ After `/sprite-use` or `/sprite-new`, these normal Pi operations target `remoteC
 - interactive `!` shell commands
 - the working-directory line added to the agent's system prompt
 
-`/sprite-local` returns those operations to the machine running Pi. Selection and open proxies reset when a Pi session starts, ends, resumes, forks, or is replaced.
+`/sprite-local` returns those operations to the machine running Pi. When a Pi session starts, resumes, forks, or is replaced, transient selection resets and configuration is reapplied; a configured `sprite` may therefore become selected again. Open proxies and last-checkpoint state are cleared between sessions.
 
 ## Commands
 
@@ -74,7 +74,7 @@ The setting does not disable Pi's normal filesystem tools; it only changes wheth
 }
 ```
 
-- `mode`: `auto`, `local`, or `remote`. `auto` uses remote routing when a Sprite is selected.
+- `mode`: `local` always keeps native tools on the Pi host; `remote` routes them when a Sprite is selected, including when Pi itself runs inside a Sprite; `auto` routes to a selected Sprite only when Pi is running outside one.
 - `sprite`: initial configured Sprite name.
 - `remoteCwd`: workspace directory inside the Sprite; otherwise `/workspace/<local-project-name>`.
 - `baseURL`: optional Sprites API endpoint override.

@@ -9,7 +9,9 @@ First-class [Sprites](https://sprites.dev) environments for the [Pi coding agent
 
 ## Install
 
-Until the first npm release, install directly from GitHub:
+`pi-sprites` is not published to npm. Until the first npm release, install it
+directly from GitHub (the repository must be public or your Git client must
+already have access):
 
 ```bash
 pi install git:github.com/superfly/pi-sprites
@@ -24,6 +26,7 @@ pi install npm:pi-sprites
 For development from this checkout:
 
 ```bash
+npm ci
 pi -e ./extensions/core.ts \
   -e ./extensions/checkpoints.ts \
   -e ./extensions/services.ts \
@@ -85,7 +88,7 @@ See the [extension guide](./docs/README.md) for prerequisites, configuration, co
 
 ## Project configuration
 
-Copy [`templates/sprites.json`](./templates/sprites.json) to `.pi/sprites.json` and adjust it for the project. Project configuration overrides `~/.pi/agent/sprites.json`; ignored `.pi/sprites.local.json` overrides both.
+Copy [`templates/sprites.json`](./templates/sprites.json) to `.pi/sprites.json` and adjust it for the project. Project configuration overrides `~/.pi/agent/sprites.json`; a machine-local `.pi/sprites.local.json` overrides both. Add the local file to the project's `.gitignore` before putting machine-specific or sensitive values in it.
 
 The major sections are:
 
@@ -104,11 +107,11 @@ With the default `toolActivation: "auto"`, commands remain available but the eig
 
 ## Checkpoints
 
-The default `risky` mode creates one safety checkpoint before the first write, edit, destructive shell command, or mutating Sprite management tool in a Pi turn. `turn` applies the same once-per-turn checkpoint to any mutation; `off` disables automatic checkpoints.
+The default `risky` mode creates one safety checkpoint before the first write, edit, recognized destructive shell command, or service, policy, or RPC-host model tool in a Pi turn. Those three model tools are conservatively treated as risky even for read-only actions. `turn` applies the same once-per-turn checkpoint before any tool call; `off` disables automatic checkpoints.
 
 Restore remains command-only and requires confirmation. Checkpoints contain the filesystem, installed packages, configuration, and on-disk databases. They do not contain running processes, memory, or open connections.
 
-Checkpoint deletion and filesystem diffs are intentionally not implemented until the public Sprites SDK exposes stable APIs for them. The package does not reach through SDK internals or assume a private checkpoint mount layout.
+Checkpoint deletion and filesystem diffs are intentionally not implemented because the installed public JavaScript SDK does not expose stable APIs for them. The package does not reach through SDK internals or assume a private checkpoint mount layout.
 
 ## Services and networking
 
@@ -153,7 +156,7 @@ This installs Pi as a Sprite service and exposes it locally through a TCP proxy.
 - `POST /rpc`
 - `GET /events` as server-sent events
 
-The service has no public HTTP port by default. When `rpcHost.httpPort` is configured, the secret named by `rpcHost.secretEnv` must be present; requests must send it as `Authorization: Bearer ...`.
+The service is not routed through the Sprite URL by default. When `rpcHost.httpPort` is configured, the secret named by `rpcHost.secretEnv` must be present and requests must send it as `Authorization: Bearer ...`. Configuring the service port does not change the Sprite URL's own `sprite` (authenticated) or `public` access setting.
 
 ## Safety defaults
 
@@ -161,9 +164,9 @@ The service has no public HTTP port by default. When `rpcHost.httpPort` is confi
 - CI and workers are retained unless cleanup is explicitly configured.
 - The RPC host is local-proxy-only unless configured otherwise.
 - Public URL access is never enabled automatically.
-- Provider credentials are not copied into Sprites.
+- Local provider credentials are not copied into Sprites automatically.
 - Project setup commands run only from a trusted project's configuration.
-- New, resumed, and forked Pi sessions reset selection, proxies, and last-checkpoint state.
+- New, resumed, and forked Pi sessions reset transient selection to configured defaults and clear proxies and last-checkpoint state.
 
 Pi packages execute with the user's full permissions. Review package source before installation, just as you would any other Pi extension.
 

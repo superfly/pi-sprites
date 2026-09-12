@@ -1,12 +1,14 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   createBashTool,
+  createBashToolDefinition,
   createEditTool,
   createFindTool,
   createGrepTool,
   createLsTool,
   createReadTool,
   createWriteTool,
+  SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { splitArgs } from "../src/args.js";
@@ -125,7 +127,7 @@ export default function coreExtension(pi: ExtensionAPI): void {
   const localRead = createReadTool(localCwd);
   const localWrite = createWriteTool(localCwd);
   const localEdit = createEditTool(localCwd);
-  const localBash = createBashTool(localCwd);
+  const localBash = createBashToolDefinition(localCwd);
   const localGrep = createGrepTool(localCwd);
   const localFind = createFindTool(localCwd);
   const localLs = createLsTool(localCwd);
@@ -157,8 +159,15 @@ export default function coreExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     ...localBash,
     async execute(id, params, signal, onUpdate, ctx) {
-      if (!runtime.remoteEnabled()) return localBash.execute(id, params, signal, onUpdate);
-      return createBashTool(runtime.remoteCwd, { operations: createRemoteBashOps(runtime.sprite()) }).execute(id, params, signal, onUpdate);
+      if (runtime.remoteEnabled()) return createBashTool(runtime.remoteCwd, { operations: createRemoteBashOps(runtime.sprite()) }).execute(id, params, signal, onUpdate);
+      const settings = SettingsManager.create(ctx.cwd, undefined, { projectTrusted: ctx.isProjectTrusted() });
+      const commandPrefix = settings.getShellCommandPrefix();
+      const shellPath = settings.getShellPath();
+      const options = {
+        ...(commandPrefix && { commandPrefix }),
+        ...(shellPath && { shellPath }),
+      };
+      return createBashToolDefinition(ctx.cwd, options).execute(id, params, signal, onUpdate, ctx);
     },
   });
 

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { getShellConfig } from "@earendil-works/pi-coding-agent";
 import type { Sprite } from "@fly/sprites";
 import core from "../extensions/core.js";
@@ -35,11 +35,13 @@ test("core bash preserves local shell settings and remote isolation", async (t) 
   const context = (trusted: boolean) => ({
     cwd,
     isProjectTrusted: () => trusted,
+    tools: [],
+    executeTool: async () => { throw new Error("Unexpected nested tool execution"); },
     sessionManager: {
       getSessionId: () => "shell-settings-test",
       getSessionFile: () => undefined,
     },
-  }) as unknown as ExtensionContext;
+  }) as unknown as ExtensionToolContext;
   const execute = (command: string, trusted = true) =>
     bashTool.execute("bash-test", { command }, undefined, undefined, context(trusted));
   const globalSettings = join(agentDir, "settings.json");

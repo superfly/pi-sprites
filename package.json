@@ -47,7 +47,7 @@
     "pack:check": "npm pack --dry-run"
   },
   "dependencies": {
-    "@fly/sprites": "^0.2.4"
+    "@fly/sprites": "^0.2.5"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
